@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI STUDIO | Professional Interior Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-body: #f4f4f4;
+            --bg-white: #ffffff;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --accent-color: #000000;
+            --border-line: #e0e0e0;
+            
+            /* Dark Editor Theme */
+            --editor-bg: #1e1e1e;
+            --editor-panel: #252525;
+            --editor-text: #eaeaea;
+            --editor-input-bg: #333333;
+            --editor-border: #3e3e3e;
+            --highlight: #3b82f6; /* Blue selection outline */
+        }
+
+        * { box-sizing: border-box; outline: none; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 0;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- Header --- */
+        header {
+            background: var(--bg-white);
+            height: 60px;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 2rem;
+            border-bottom: 1px solid var(--border-line);
+            flex-shrink: 0;
+            z-index: 100;
+        }
+        .brand { font-weight: 700; font-size: 1.2rem; letter-spacing: -0.5px; }
+        .brand span { font-weight: 300; color: #888; }
+        
+        .progress-track {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 2px; background: transparent;
+        }
+        .progress-fill {
+            height: 100%; background: var(--accent-color); width: 0%; transition: width 0.5s ease;
+        }
+
+        /* --- Layout System --- */
+        main {
+            flex: 1; position: relative; overflow: hidden;
+        }
+        .view-layer {
+            position: absolute; inset: 0;
+            background: var(--bg-body);
+            transform: translateY(20px); opacity: 0; pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            overflow-y: auto;
+            display: flex; flex-direction: column;
+        }
+        .view-layer.active {
+            transform: translateY(0); opacity: 1; pointer-events: all; z-index: 10;
+        }
+
+        /* --- BUTTONS --- */
+        .btn-primary {
+            background: var(--accent-color); color: white;
+            padding: 12px 24px; border: none; border-radius: 6px;
+            font-size: 0.9rem; font-weight: 500; cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .btn-primary:hover { opacity: 0.9; }
+
+        /* --- STEP 1: INPUT FORM --- */
+        .center-container {
+            max-width: 800px; margin: 4rem auto; width: 90%;
+            background: var(--bg-white); padding: 3rem; border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+        .page-title { font-size: 1.8rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .page-sub { color: var(--text-secondary); margin-bottom: 2.5rem; }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .span-2 { grid-column: span 2; }
+
+        .input-wrap label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
+        .input-field {
+            width: 100%; padding: 12px; border: 1px solid var(--border-line);
+            border-radius: 6px; font-family: inherit; font-size: 0.95rem;
+            transition: border 0.2s;
+        }
+        .input-field:focus { border-color: var(--accent-color); }
+
+        .upload-zone {
+            border: 2px dashed var(--border-line); background: #fafafa;
+            border-radius: 6px; padding: 2rem; text-align: center;
+            cursor: pointer; transition: 0.2s;
+        }
+        .upload-zone:hover { border-color: #999; background: #f0f0f0; }
+
+        /* --- STEP 2: GALLERY --- */
+        .gallery-container { padding: 3rem 5%; }
+        .gallery-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 2rem; margin-top: 2rem;
+        }
+        .design-card {
+            background: var(--bg-white); border-radius: 12px; overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s; cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .design-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+        .design-card.selected { border: 2px solid var(--accent-color); }
+        
+        .card-img-box { height: 240px; background: #eee; position: relative; overflow: hidden; }
+        .card-img { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; }
+        .design-card:hover .card-img { transform: scale(1.05); }
+        
+        .card-info { padding: 1.5rem; }
+        .card-title { font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem; }
+        .card-tags { display: flex; gap: 8px; margin-top: 1rem; }
+        .tag { font-size: 0.75rem; background: #f0f0f0; padding: 4px 8px; border-radius: 4px; color: #666; }
+
+        /* --- STEP 3: EDITOR (FIXED) --- */
+        .editor-wrapper { display: flex; height: 100%; background: var(--editor-bg); }
+
+        /* Canvas */
+        .canvas-area {
+            flex: 1; position: relative;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+            background-image: radial-gradient(#333 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        .image-container {
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            max-width: 90%; max-height: 85%;
+        }
+        .base-image { display: block; max-height: 80vh; max-width: 100%; }
+
+        /* The NEW Visible Hotspot */
+        .hotspot-indicator {
+            position: absolute; bottom: 30%; left: 45%;
+            width: 30px; height: 30px; background: white; border-radius: 50%;
+            box-shadow: 0 0 20px rgba(255,255,255,0.8); cursor: pointer; z-index: 20;
+            display: flex; align-items: center; justify-content: center;
+            animation: pulse 1.5s infinite; color: var(--highlight); font-weight: bold;
+        }
+        @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); } 70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); } }
+
+        /* Bounding Box (Initially Hidden) */
+        .bounding-box {
+            position: absolute; bottom: 12%; left: 22%; width: 45%; height: 28%;
+            border: 2px solid var(--highlight);
+            cursor: pointer; display: none; /* Hidden by default */
+            background: rgba(59, 130, 246, 0.1);
+        }
+        .bounding-box.active { display: block; }
+        .handle { position: absolute; width: 8px; height: 8px; background: white; border: 1px solid var(--highlight); }
+        .h-tl { top: -4px; left: -4px; } .h-tr { top: -4px; right: -4px; }
+        .h-bl { bottom: -4px; left: -4px; } .h-br { bottom: -4px; right: -4px; }
+
+        /* Sidebar */
+        .properties-panel {
+            width: 320px; background: var(--editor-panel);
+            border-left: 1px solid var(--editor-border); color: var(--editor-text);
+            display: flex; flex-direction: column;
+        }
+        .panel-header { padding: 1.5rem; border-bottom: 1px solid var(--editor-border); font-size: 0.9rem; font-weight: 600; color: #888; letter-spacing: 0.5px; }
+        .panel-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+        .empty-state { text-align: center; color: #666; margin-top: 3rem; font-size: 0.9rem; }
+
+        /* Controls */
+        .controls-group { margin-bottom: 2rem; display: none; }
+        .controls-group.visible { display: block; animation: slideIn 0.3s; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+
+        .prop-row { margin-bottom: 12px; }
+        .prop-label { display: flex; justify-content: space-between; font-size: 0.75rem; color: #aaa; margin-bottom: 5px; }
+        .prop-val { color: var(--highlight); }
+        
+        input[type=range] { width: 100%; -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #444; border-radius: 2px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%; background: #fff; margin-top: -5px; cursor: pointer; }
+
+        .mat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+        .mat-item { aspect-ratio: 1; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+        .mat-item.active { border-color: white; transform: scale(1.1); }
+        .t-fabric { background: #555; } .t-leather { background: #8d6e63; } .t-velvet { background: #1a237e; } .t-linen { background: #e0e0e0; }
+
+        .action-footer { padding: 1.5rem; border-top: 1px solid var(--editor-border); }
+        .btn-full { width: 100%; padding: 12px; background: var(--highlight); border: none; color: white; font-weight: 600; border-radius: 4px; cursor: pointer; transition: 0.2s;}
+        .btn-full:hover { background: #2563eb; }
+
+        /* --- STEP 4: FINAL RESULT (NEW) --- */
+        .result-wrapper { padding: 3rem 5%; text-align: center; }
+        .result-image-box { max-width: 900px; margin: 0 auto 2rem auto; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
+        .result-image-box img { width: 100%; display: block; }
+        .download-btns { display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; }
+        .btn-outline { background: transparent; border: 1px solid var(--text-primary); padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; }
+        .btn-outline:hover { background: var(--text-primary); color: white; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="brand">AI <span>STUDIO</span></div>
+    <div style="font-size: 0.8rem; color: #666;">Project: Untitled-1</div>
+    <div style="position: relative; width: 100%; height: 100%; position: absolute; top:0; left:0; pointer-events: none;">
+        <div class="progress-track"><div class="progress-fill" id="progress-bar"></div></div>
+    </div>
+</header>
+
+<main>
+
+    <section id="view-1" class="view-layer active">
+        <div class="center-container">
+            <h1 class="page-title">Project Parameters</h1>
+            <p class="page-sub">Define spatial constraints to initialize the generative model.</p>
+            
+            <form onsubmit="navigateTo(2, event)">
+                <div class="form-grid">
+                    <div class="input-wrap">
+                        <label>Space Function</label>
+                        <input type="text" class="input-field" list="functions" placeholder="e.g. Living Room">
+                        <datalist id="functions">
+                            <option value="Living Room"><option value="Home Office"><option value="Master Bedroom"><option value="Retail Store">
+                        </datalist>
+                    </div>
+
+                    <div class="input-wrap">
+                        <label>Est. Area (m²)</label>
+                        <input type="number" class="input-field" placeholder="45">
+                    </div>
+
+                    <div class="input-wrap">
+                        <label>Ceiling Height (m)</label>
+                        <input type="number" class="input-field" placeholder="2.8" step="0.1">
+                    </div>
+
+                    <div class="input-wrap">
+                        <label>Design Language</label>
+                        <select class="input-field">
+                            <option>Modern Minimalist</option>
+                            <option>Scandinavian</option>
+                            <option>Industrial Loft</option>
+                            <option>Mid-Century Modern</option>
+                        </select>
+                    </div>
+
+                    <div class="span-2 input-wrap">
+                        <label>Floorplan / Context</label>
+                        <div class="upload-zone" onclick="document.getElementById('file-in').click()">
+                            <input type="file" id="file-in" hidden>
+                            <div style="font-size: 1.5rem; color: #ccc;">+</div>
+                            <div style="font-weight: 500; margin-top: 5px;">Upload Blueprint or Photo</div>
+                            <div style="font-size: 0.8rem; color: #999;">Supports JPG, PNG, PDF</div>
+                        </div>
+                    </div>
+                    
+                    <div class="span-2 input-wrap">
+                        <label>Specific Requirements</label>
+                        <textarea class="input-field" rows="2" placeholder="e.g. Need a sectional sofa for 5 people, south-facing light..."></textarea>
+                    </div>
+                </div>
+
+                <div style="margin-top: 2rem; text-align: right;">
+                    <button type="submit" class="btn-primary">Generate Proposals &rarr;</button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section id="view-2" class="view-layer">
+        <div class="gallery-container">
+            <h2 style="font-size: 2rem; margin: 0;">Design Proposals</h2>
+            <p style="color: #666; margin-top: 5px;">AI generated 3 optimized layouts based on your input.</p>
+
+            <div class="gallery-grid" id="gallery-grid">
+                </div>
+        </div>
+    </section>
+
+    <section id="view-3" class="view-layer">
+        <div class="editor-wrapper">
+            <div class="canvas-area">
+                <div class="image-container">
+                    <img src="https://images.unsplash.com/photo-1567016432779-094069958ea5?q=80&w=1600&auto=format&fit=crop" class="base-image" alt="Design Render">
+                    
+                    <div class="hotspot-indicator" id="hotspot" onclick="selectObject()">+</div>
+
+                    <div class="bounding-box" id="sofa-box">
+                        <div class="handle h-tl"></div><div class="handle h-tr"></div>
+                        <div class="handle h-bl"></div><div class="handle h-br"></div>
+                        <div style="position: absolute; top: -25px; left: 0; background: var(--highlight); color: white; padding: 2px 6px; font-size: 10px; border-radius: 2px;">SOFA SECTIONAL</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="properties-panel">
+                <div class="panel-header">Inspector</div>
+                
+                <div class="panel-body">
+                    <div id="empty-state" class="empty-state">
+                        <div style="font-size: 2rem; margin-bottom: 10px; opacity: 0.3;">✣</div>
+                        Select the object marked with <strong>(+)</strong><br>to edit properties.
+                    </div>
+
+                    <div id="obj-controls" class="controls-group">
+                        <div style="font-size: 0.8rem; font-weight: 700; color: #fff; margin-bottom: 1rem; display: flex; justify-content: space-between;">
+                            SELECTED OBJECT <span style="color: #666;">ID: SOFA_04</span>
+                        </div>
+
+                        <div style="border-bottom: 1px solid #333; margin-bottom: 1.5rem; padding-bottom: 0.5rem;">
+                            <div class="prop-label">TRANSFORM</div>
+                            <div class="prop-row">
+                                <div class="prop-label">Position X <span class="prop-val" id="val-x">120cm</span></div>
+                                <input type="range" min="0" max="500" value="120" oninput="updateVal('x', this.value)">
+                            </div>
+                            <div class="prop-row">
+                                <div class="prop-label">Position Y <span class="prop-val" id="val-y">0cm</span></div>
+                                <input type="range" min="0" max="500" value="0" oninput="updateVal('y', this.value)">
+                            </div>
+                        </div>
+
+                        <div style="border-bottom: 1px solid #333; margin-bottom: 1.5rem; padding-bottom: 0.5rem;">
+                            <div class="prop-label">DIMENSIONS</div>
+                            <div class="prop-row">
+                                <div class="prop-label">Width <span class="prop-val" id="val-w">240cm</span></div>
+                                <input type="range" min="100" max="400" value="240" oninput="updateVal('w', this.value)">
+                            </div>
+                            <div class="prop-row">
+                                <div class="prop-label">Depth <span class="prop-val" id="val-d">95cm</span></div>
+                                <input type="range" min="60" max="150" value="95" oninput="updateVal('d', this.value)">
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="prop-label" style="margin-bottom: 10px;">MATERIAL / TEXTURE</div>
+                            <div class="mat-grid">
+                                <div class="mat-item t-fabric active" onclick="setMat(this)"></div>
+                                <div class="mat-item t-leather" onclick="setMat(this)"></div>
+                                <div class="mat-item t-velvet" onclick="setMat(this)"></div>
+                                <div class="mat-item t-linen" onclick="setMat(this)"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-footer">
+                    <button class="btn-full" onclick="navigateTo(4)">Update & Render Scene</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="view-4" class="view-layer">
+        <div class="result-wrapper">
+            <h1 class="page-title">Final Render Complete</h1>
+            <p class="page-sub">Your design is ready for fabrication and export.</p>
+
+            <div class="result-image-box">
+                <img src="https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1200&auto=format&fit=crop" alt="Final Result">
+            </div>
+
+            <div class="download-btns">
+                <button class="btn-primary" onclick="alert('Downloading .OBJ File...')">Download 3D Model (.OBJ)</button>
+                <button class="btn-outline" onclick="alert('Downloading PDF Specs...')">Download Blueprints (.PDF)</button>
+            </div>
+            
+            <div style="margin-top: 3rem;">
+                <span style="color: #666; font-size: 0.9rem; cursor: pointer; text-decoration: underline;" onclick="location.reload()">Start New Project</span>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<script>
+    // --- Configuration ---
+    const designs = [
+        {
+            title: "Modern Open Concept",
+            desc: "Maximizes natural light flow with low-profile furniture.",
+            img: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?q=80&w=600&auto=format&fit=crop",
+            tags: ["Social", "Airy"]
+        },
+        {
+            title: "Executive Minimalist",
+            desc: "Focuses on clean lines and functional separation.",
+            img: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=600&auto=format&fit=crop",
+            tags: ["Productive", "Sleek"]
+        },
+        {
+            title: "Nordic Comfort",
+            desc: "Prioritizes soft textures and warm tonal lighting.",
+            img: "https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?q=80&w=600&auto=format&fit=crop",
+            tags: ["Hygge", "Warm"]
+        }
+    ];
+
+    // --- Navigation Logic ---
+    function navigateTo(viewIndex, e) {
+        if(e) e.preventDefault();
+        
+        // Hide all views
+        document.querySelectorAll('.view-layer').forEach(el => el.classList.remove('active'));
+        
+        // Show target view
+        document.getElementById(`view-${viewIndex}`).classList.add('active');
+        
+        // Update Progress Bar
+        const percent = (viewIndex / 4) * 100;
+        document.getElementById('progress-bar').style.width = `${percent}%`;
+
+        // Load Gallery if View 2
+        if(viewIndex === 2) loadGallery();
+    }
+
+    // --- Gallery Logic ---
+    function loadGallery() {
+        const grid = document.getElementById('gallery-grid');
+        grid.innerHTML = ''; // clear previous
+        
+        designs.forEach((d, i) => {
+            const card = document.createElement('div');
+            card.className = 'design-card';
+            card.onclick = () => navigateTo(3);
+            card.innerHTML = `
+                <div class="card-img-box">
+                    <img src="${d.img}" class="card-img" alt="Interior">
+                </div>
+                <div class="card-info">
+                    <div class="card-title">${d.title}</div>
+                    <div style="font-size: 0.85rem; color: #666; line-height: 1.4;">${d.desc}</div>
+                    <div class="card-tags">
+                        ${d.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    // --- Editor Logic (Step 3 - FIXED) ---
+    function selectObject() {
+        // 1. Hide the Pulse Button
+        document.getElementById('hotspot').style.display = 'none';
+
+        // 2. Show the Bounding Box
+        document.getElementById('sofa-box').classList.add('active');
+
+        // 3. Show the Controls Panel
+        document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('obj-controls').classList.add('visible');
+    }
+
+    // Update Number Displays
+    function updateVal(id, val, suffix = 'cm') {
+        document.getElementById(`val-${id}`).innerText = val + suffix;
+    }
+
+    // Material Selection
+    function setMat(el) {
+        document.querySelectorAll('.mat-item').forEach(m => m.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    // Init progress
+    document.getElementById('progress-bar').style.width = '25%';
+
+</script>
+
+</body>
+</html>
